@@ -44,8 +44,8 @@ export class DebugRenderer {
     this.panelHeader.setInteractive({ useHandCursor: true });
     this.panelHeader.on('pointerdown', () => this.togglePanel());
 
-    // Create background
-    this.panelBackground = this.scene.add.rectangle(10, 30, 160, 200, 0x000000, 0.75);
+    // Create background (shorter now that flags are at top center)
+    this.panelBackground = this.scene.add.rectangle(10, 30, 160, 160, 0x000000, 0.75);
     this.panelBackground.setOrigin(0, 0);
     this.panelBackground.setScrollFactor(0);
     this.panelBackground.setDepth(1000);
@@ -56,9 +56,11 @@ export class DebugRenderer {
     this.panelHeader.setText(this.panelCollapsed ? '[+] Debug Info' : '[-] Debug Info');
     this.panelBackground.setVisible(!this.panelCollapsed);
 
-    // Hide/show content
+    // Hide/show content (except state label and flags which are positioned elsewhere)
     for (const [key, text] of this.textObjects) {
-      if (key !== 'stateLabel') { // State label follows player, not in panel
+      const isStateLabel = key === 'stateLabel';
+      const isFlag = key.startsWith('flag_');
+      if (!isStateLabel && !isFlag) {
         text.setVisible(!this.panelCollapsed && this.enabled);
       }
     }
@@ -309,37 +311,55 @@ export class DebugRenderer {
   }
 
   private drawFlags(info: PlayerDebugInfo): void {
-    if (this.panelCollapsed) return;
-
-    const key = 'flags';
-    let text = this.textObjects.get(key);
-
-    if (!text) {
-      text = this.scene.add.text(18, 200, '', {
-        fontSize: '11px',
-        fontFamily: 'monospace'
-      });
-      text.setDepth(1001);
-      text.setScrollFactor(0);
-      this.textObjects.set(key, text);
-    }
-
     const flags = [
-      { name: 'GND', active: info.isGrounded },
-      { name: 'WALL', active: info.isTouchingWall },
-      { name: 'APEX', active: info.isAtApex },
-      { name: 'DASH', active: info.canDash }
+      { name: 'GND', active: info.isGrounded, activeColor: '#22cc66', inactiveColor: '#334433' },
+      { name: 'WALL', active: info.isTouchingWall, activeColor: '#44aaff', inactiveColor: '#333344' },
+      { name: 'APEX', active: info.isAtApex, activeColor: '#ffaa22', inactiveColor: '#443322' },
+      { name: 'DASH', active: info.canDash, activeColor: '#ff44aa', inactiveColor: '#442233' }
     ];
 
-    const flagStr = flags
-      .map(f => (f.active ? `[${f.name}]` : ` ${f.name} `))
-      .join(' ');
+    const camWidth = this.scene.cameras.main.width;
+    const badgeWidth = 52;
+    const badgeSpacing = 6;
+    const totalWidth = flags.length * badgeWidth + (flags.length - 1) * badgeSpacing;
+    const startX = (camWidth - totalWidth) / 2;
+    const y = 12;
 
-    text.setText(flagStr);
-    text.setStyle({
-      color: '#88ff88'
+    flags.forEach((flag, index) => {
+      const key = `flag_${flag.name}`;
+      let text = this.textObjects.get(key);
+
+      if (!text) {
+        text = this.scene.add.text(0, 0, flag.name, {
+          fontSize: '12px',
+          fontFamily: 'monospace',
+          fontStyle: 'bold',
+          padding: { x: 10, y: 6 },
+          fixedWidth: badgeWidth,
+          align: 'center'
+        });
+        text.setDepth(1001);
+        text.setScrollFactor(0);
+        this.textObjects.set(key, text);
+      }
+
+      const x = startX + index * (badgeWidth + badgeSpacing);
+      text.setPosition(x, y);
+
+      if (flag.active) {
+        text.setStyle({
+          backgroundColor: flag.activeColor,
+          color: '#ffffff'
+        });
+      } else {
+        text.setStyle({
+          backgroundColor: flag.inactiveColor,
+          color: '#666666'
+        });
+      }
+
+      text.setVisible(true);
     });
-    text.setVisible(true);
   }
 
   destroy(): void {
